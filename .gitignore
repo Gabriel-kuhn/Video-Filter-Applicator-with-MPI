@@ -1,0 +1,8 @@
+# Vídeo de resultado
+result.avi
+
+
+# Pastas de configuração de IDE
+.vscode/
+.idea/
+cmake-build-*/W
