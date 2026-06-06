@@ -16,7 +16,9 @@ void start_master(int size, int width, int height, double fps, int total_bytes) 
     int next_frame_to_show = 0;
     bool has_user_exit = false; // variável de controle para saber quando o usuário finalizou o programa
     
-    // Uma "sala de espera" para guardar os frames que voltarem fora de ordem
+    // Matriz de resultado -> buffer
+    // Ela serve para guardar os frames procesados
+    // Caso algum trabalhador termine seu trabalho mas não é hora de exibir ele ainda, guardamos ele para quando for a hora de exibí-lo
     std::map<int, cv::Mat> buffer;
 
     // Loop de Envio Inicial
@@ -39,7 +41,16 @@ void start_master(int size, int width, int height, double fps, int total_bytes) 
     // ele será reativo, a cada vez que algum trabalhador enviar um frame processado (pronto)
     // o master receberá, adiciona-rá na lista de forma ordenada
     // e liberará mais um frame para aquele worker seguir trabalhando
+
+    // A codição do while funciona da seguinte forma:
+    // Enquanto o id do frame que eu preciso exibir (next_frame_to_show) for menor 
+    // Que o total de frames que eu já capturei da câmera e enviei para a rede (frame_id), o loop continua.
+    // Em outra palavras, enquanto ainda tiver trabalho a ser feito, continue distribuido o trabalho
     while (next_frame_to_show < frame_id) {
+
+        // Vamos iniciar uma matriz de 3 canais com todos os valores zerados
+        // Basicamente é uma imagem toda preta
+        // Serve para guaradar na memória a matriz que portará o resultado do frame processado
         cv::Mat received_frame = cv::Mat::zeros(height, width, CV_8UC3);
         MPI_Status status;
 
