@@ -99,6 +99,9 @@ void start_master(int size, int width, int height, double fps, int total_bytes) 
         // O id do frame processado serve como endereço para a lista ordenada
         buffer[recycled_frame_id] = received_frame;
 
+        printf("[Coordenador] Frame Recebido: Frame %d (Tag: %d) Worker Responsável: %d\n", 
+                   recycled_frame_id, received_tag, worker_source);
+
         // CRITÉRIO DE RECOMPOSIÇÃO: Verifica se o frame que precisamos exibir agora já está na sala de espera
         while (buffer.find(next_frame_to_show) != buffer.end()) {
             // Exibe o frame correto na ordem cronológica literal
@@ -155,6 +158,10 @@ void start_master(int size, int width, int height, double fps, int total_bytes) 
             int formated_tag = get_formated_tag(current_filter, frame_id);
  
             MPI_Send(frame.data, total_bytes, MPI_UNSIGNED_CHAR, worker_source, formated_tag, MPI_COMM_WORLD);
+            
+            printf("[Coordenador] Frame Enviado: Frame %d (Tag: %d) Worker Responsável: %d\n", 
+                   frame_id, formated_tag, worker_source);
+
             frame_id++;
         }
     }
@@ -163,6 +170,8 @@ void start_master(int size, int width, int height, double fps, int total_bytes) 
     // Envia sinal de término (Tag de encerramento), os trabalhadores precisam saber se eles devem para seu processamento
     for (int i = 1; i < size; i++) {
         MPI_Send(NULL, 0, MPI_UNSIGNED_CHAR, i, END_TAG, MPI_COMM_WORLD); // 999999 = Tag de encerramento
+        printf("[Coordenador] Enviou a Tag de Encerramento: %d. Finalizando o Processo do Worker %d\n", END_TAG, i);
+
     }
 
     // Liberação de recursos
@@ -176,6 +185,11 @@ void start_worker(int width, int height, int total_bytes) {
     cv::Mat send_buffer = cv::Mat::zeros(height, width, CV_8UC3);
     MPI_Status status;
 
+    // Resgata o rank atual do worker para usar no printf
+    // Feito antes do loop para que seja pego apenas uma vez
+    int rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+
     while (true) {
         // Recebe o frame que será trabalhado
         MPI_Recv(receive_buffer.data, total_bytes, MPI_UNSIGNED_CHAR, 0, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
@@ -184,10 +198,15 @@ void start_worker(int width, int height, int total_bytes) {
         // Caso seja, o trabalhador sabe que deve parar seu processamento
         int tag = status.MPI_TAG;
         if (tag == END_TAG) {
+            printf("[Worker %d] Recebeu a Flag de Encerramento: %d. Finalizando o Processo\n", rank, tag);
             break;
         }
 
         int current_filter = tag / CICLO_ID;
+        int frame_id = tag % CICLO_ID; // Extrai o ID do frame da tag para o log
+
+        printf("[Worker %d] Frame Recebido: %d, (Tag: %d), Filtro a ser aplicado: %d\n", 
+               rank, frame_id, tag, current_filter);
 
         // Aplica o filtro
         if (current_filter == 1) {
