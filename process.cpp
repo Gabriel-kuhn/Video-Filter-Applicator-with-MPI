@@ -146,9 +146,7 @@ void start_master(int size, int width, int height, double fps, int total_bytes) 
             // Libera os recursos locais do Master antes de fechar tudo
             capture.release();
             cv::destroyAllWindows();
-            
-            // Aborta todos os processos do COMM_WORLD de forma limpa e síncrona
-            MPI_Abort(MPI_COMM_WORLD, 0);
+    
             break;
         }
 
@@ -167,11 +165,20 @@ void start_master(int size, int width, int height, double fps, int total_bytes) 
     }
 
 
+    // Antes de finalizar precisamos fazer um Receive para que os worker que ainda estão trabalhando terminem de enviar
+    // Seus frames, depois de garantir que todos os Workers estarão esperando um novo envio, ai sim podemos enviar a tag de encerramento
+    int frames_pendentes = frame_id - next_frame_to_show;
+    for (int i = 0; i < frames_pendentes; i++) {
+        // Apenas fazemos um Receive, não ligamos pro resultado porque o programa já foi encerrado
+        cv::Mat descartar_frame = cv::Mat::zeros(height, width, CV_8UC3); 
+        MPI_Status status;
+        MPI_Recv(descartar_frame.data, total_bytes, MPI_UNSIGNED_CHAR, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
+    }
+
     // Envia sinal de término (Tag de encerramento), os trabalhadores precisam saber se eles devem para seu processamento
     for (int i = 1; i < size; i++) {
         MPI_Send(NULL, 0, MPI_UNSIGNED_CHAR, i, END_TAG, MPI_COMM_WORLD); // 999999 = Tag de encerramento
         printf("[Coordenador] Enviou a Tag de Encerramento: %d. Finalizando o Processo do Worker %d\n", END_TAG, i);
-
     }
 
     // Liberação de recursos
