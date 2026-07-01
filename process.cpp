@@ -126,6 +126,14 @@ void start_master(int size, int width, int height, double fps, int total_bytes) 
             } else if (key == '3') {
                 current_filter = 3;
                 printf("[Coordenador] Filtro alterado para: 3 (Sharpen)\n");
+
+            } else if (key == '4') {
+                current_filter = 4;
+                printf("[Coordenador] Filtro alterado para: 4 (Gaussiano)\n");
+
+            } else if (key == '5') {
+                current_filter = 5;
+                printf("[Coordenador] Filtro alterado para: 5 (Sobel)\n");
             }
         }
 
@@ -190,6 +198,12 @@ void start_worker(int width, int height, int total_bytes) {
 
         } else if (current_filter == 3) {
             applySharpen(receive_buffer, send_buffer);
+
+        } else if (current_filter == 4) {
+            applyGaussian(receive_buffer, send_buffer);
+
+        } else if (current_filter == 5) {
+            applySobel(receive_buffer, send_buffer);
 
         } else {
             receive_buffer.copyTo(send_buffer); // caso venha algo inválido mostra a imagem original

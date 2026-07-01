@@ -1,5 +1,6 @@
 #include "filters.h"
 #include <omp.h>
+#include <cmath>
 
 
 void applyGrayScale(const cv::Mat& entrada, cv::Mat& saida) {
@@ -76,6 +77,104 @@ void applySharpen(const cv::Mat& entrada, cv::Mat& saida) {
             novoPixel[2] = cv::saturate_cast<uchar>(vermelhoAcumulado);
 
             saida.at<cv::Vec3b>(i, j) = novoPixel;
+        }
+    }
+}
+
+void applyGaussian(const cv::Mat& entrada, cv::Mat& saida) {
+    omp_set_num_threads(2); // Assim não forçamos tanto a CPU
+
+    saida = cv::Mat::zeros(entrada.size(), entrada.type());
+    int linhas = entrada.rows;
+    int colunas = entrada.cols;
+
+    // Kernel Gaussiano 5x5 (aproximação inteira da distribuição normal)
+    // A soma dos pesos é 256, por isso dividimos o resultado acumulado por 256
+    int kernel[5][5] = {
+        { 1,  4,  6,  4, 1 },
+        { 4, 16, 24, 16, 4 },
+        { 6, 24, 36, 24, 6 },
+        { 4, 16, 24, 16, 4 },
+        { 1,  4,  6,  4, 1 }
+    };
+    const int pesoTotal = 256;
+
+    // Como o kernel é 5x5, precisamos de uma borda de 2 pixels para não acessar
+    // posições fora da matriz (por isso o laço começa em 2 e termina em -2)
+    #pragma omp parallel for schedule(dynamic)
+    for (int i = 2; i < linhas - 2; i++) {
+        for (int j = 2; j < colunas - 2; j++) {
+            int azulAcumulado = 0, verdeAcumulado = 0, vermelhoAcumulado = 0;
+
+            for (int k_i = -2; k_i <= 2; k_i++) {
+                for (int k_j = -2; k_j <= 2; k_j++) {
+                    cv::Vec3b vizinho = entrada.at<cv::Vec3b>(i + k_i, j + k_j);
+                    int peso = kernel[k_i + 2][k_j + 2];
+
+                    azulAcumulado     += vizinho[0] * peso;
+                    verdeAcumulado    += vizinho[1] * peso;
+                    vermelhoAcumulado += vizinho[2] * peso;
+                }
+            }
+
+            cv::Vec3b novoPixel;
+            novoPixel[0] = cv::saturate_cast<uchar>(azulAcumulado / pesoTotal);
+            novoPixel[1] = cv::saturate_cast<uchar>(verdeAcumulado / pesoTotal);
+            novoPixel[2] = cv::saturate_cast<uchar>(vermelhoAcumulado / pesoTotal);
+
+            saida.at<cv::Vec3b>(i, j) = novoPixel;
+        }
+    }
+}
+
+void applySobel(const cv::Mat& entrada, cv::Mat& saida) {
+    omp_set_num_threads(2); // Assim não forçamos tanto a CPU
+
+    saida = cv::Mat::zeros(entrada.size(), entrada.type());
+    int linhas = entrada.rows;
+    int colunas = entrada.cols;
+
+    // Máscaras de Sobel para detecção de bordas horizontais (Gx) e verticais (Gy)
+    int kernelX[3][3] = {
+        { -1, 0, 1 },
+        { -2, 0, 2 },
+        { -1, 0, 1 }
+    };
+
+    int kernelY[3][3] = {
+        { -1, -2, -1 },
+        {  0,  0,  0 },
+        {  1,  2,  1 }
+    };
+
+    #pragma omp parallel for schedule(dynamic)
+    for (int i = 1; i < linhas - 1; i++) {
+        for (int j = 1; j < colunas - 1; j++) {
+            int gx = 0, gy = 0;
+
+            for (int k_i = -1; k_i <= 1; k_i++) {
+                for (int k_j = -1; k_j <= 1; k_j++) {
+                    cv::Vec3b vizinho = entrada.at<cv::Vec3b>(i + k_i, j + k_j);
+
+                    // Convertemos o vizinho para tom de cinza antes de aplicar o Sobel,
+                    // pois a detecção de bordas é feita sobre a intensidade luminosa
+                    int cinza = (int)(0.114 * vizinho[0] + 0.587 * vizinho[1] + 0.299 * vizinho[2]);
+
+                    gx += cinza * kernelX[k_i + 1][k_j + 1];
+                    gy += cinza * kernelY[k_i + 1][k_j + 1];
+                }
+            }
+
+            // Magnitude do gradiente: indica a intensidade da borda naquele ponto
+            int magnitude = (int) std::sqrt((double)(gx * gx + gy * gy));
+            uchar bordaIntensidade = cv::saturate_cast<uchar>(magnitude);
+
+            cv::Vec3b pixelBorda;
+            pixelBorda[0] = bordaIntensidade;
+            pixelBorda[1] = bordaIntensidade;
+            pixelBorda[2] = bordaIntensidade;
+
+            saida.at<cv::Vec3b>(i, j) = pixelBorda;
         }
     }
 }
