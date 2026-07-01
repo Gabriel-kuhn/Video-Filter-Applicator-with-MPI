@@ -4,8 +4,7 @@
 
 
 void applyGrayScale(const cv::Mat& entrada, cv::Mat& saida) {
-    omp_set_num_threads(2); // Assim não forçamos tanto a CPU
-
+    
     // Garante que a imagem de saída tenha o mesmo tamanho e tipo da entrada
     saida = cv::Mat::zeros(entrada.size(), entrada.type());
 
@@ -43,7 +42,6 @@ void applyGrayScale(const cv::Mat& entrada, cv::Mat& saida) {
 }
 
 void applySharpen(const cv::Mat& entrada, cv::Mat& saida) {
-    omp_set_num_threads(2); // Assim não forçamos tanto a CPU
 
     saida = cv::Mat::zeros(entrada.size(), entrada.type());
     int linhas = entrada.rows;
@@ -82,8 +80,7 @@ void applySharpen(const cv::Mat& entrada, cv::Mat& saida) {
 }
 
 void applyGaussian(const cv::Mat& entrada, cv::Mat& saida) {
-    omp_set_num_threads(2); // Assim não forçamos tanto a CPU
-
+    
     saida = cv::Mat::zeros(entrada.size(), entrada.type());
     int linhas = entrada.rows;
     int colunas = entrada.cols;
@@ -128,8 +125,7 @@ void applyGaussian(const cv::Mat& entrada, cv::Mat& saida) {
 }
 
 void applySobel(const cv::Mat& entrada, cv::Mat& saida) {
-    omp_set_num_threads(2); // Assim não forçamos tanto a CPU
-
+    
     saida = cv::Mat::zeros(entrada.size(), entrada.type());
     int linhas = entrada.rows;
     int colunas = entrada.cols;
